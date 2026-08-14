@@ -17,6 +17,8 @@
 
 ```
 https://<你的GitHub用户名>.github.io/EconIntel/
+
+https://ecircle6.github.io/EconIntel/
 ```
 
 数据每天自动更新，页面打开期间检测到新数据会自动提示刷新。也可以把生成的 `site/EconIntel-离线版.html` 单文件发给别人——**双击即用，完全离线**。
