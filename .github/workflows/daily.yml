@@ -5,6 +5,8 @@
 name: econintel-daily
 
 on:
+  push:
+    branches: [main]      # 推送即部署（首次推送自动触发构建）
   schedule:
     - cron: "0 0 * * *"   # 北京时间 08:00
     - cron: "0 4 * * *"   # 北京时间 12:00（兜底）
@@ -55,7 +57,8 @@ jobs:
           git config user.name "econintel-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add generator/data
-          git diff --cached --quiet || (git commit -m "chore: 每日数据更新 $(date -u +%Y-%m-%d)" && git push)
+          # [skip ci]：备份推送不触发新构建（防止 workflow 循环触发）
+          git diff --cached --quiet || (git commit -m "chore: 每日数据更新 $(date -u +%Y-%m-%d) [skip ci]" && git push)
 
       - name: 上传站点产物
         if: steps.run.outputs.ok == 'true'
