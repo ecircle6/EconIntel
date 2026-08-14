@@ -40,15 +40,21 @@ jobs:
           EI_LLM_BASE_URL: ${{ secrets.EI_LLM_BASE_URL }}
           EI_LLM_MODEL: ${{ secrets.EI_LLM_MODEL }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            python generator/scripts/daily.py --force > /tmp/run.log 2>&1
-          else
+          # push（代码变更）与手动触发：必须用新代码重建（--force）
+          # schedule 定时：--if-stale 防止 5 小时内重复跑
+          if [ "${{ github.event_name }}" = "schedule" ]; then
             python generator/scripts/daily.py --if-stale > /tmp/run.log 2>&1
+          else
+            python generator/scripts/daily.py --force > /tmp/run.log 2>&1
           fi
           tail -30 /tmp/run.log
           if grep -q "RESULT=OK" /tmp/run.log; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: 文档一致性检查（README 与代码配置同步）
+        if: steps.run.outputs.ok == 'true'
+        run: python generator/scripts/check_docs.py
 
       - name: 提交 SQLite 数据库备份
         if: steps.run.outputs.ok == 'true'
