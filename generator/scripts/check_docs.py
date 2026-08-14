@@ -57,6 +57,18 @@ def main() -> int:
     code_is_6h = cron == "0 */6 * * *"
     results.append(_check("更新频率（README 声称『每 6 小时』）", readme_says, code_is_6h))
 
+    # 3b) 各处更新频率文案不得残留过时的「每天 08:00」表述
+    frontend_html = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
+    exporter_src = (GENERATOR / "app" / "exporters" / "site.py").read_text(encoding="utf-8")
+    stale_in_readme = "每天北京时间 08:00" in readme or "每日北京时间 08:00" in readme
+    stale_in_frontend = "08:00 自动更新" in frontend_html
+    stale_in_exporter = "08:00 自动更新" in exporter_src
+    results.append(_check("README 无过时『每天 08:00』表述", not stale_in_readme, True))
+    results.append(_check("前端页脚更新频率文案（含『每 6 小时』）",
+                          "每 6 小时自动更新" in frontend_html, True))
+    results.append(_check("状态页 update_schedule 文案（含『每 6 小时』）",
+                          "每 6 小时自动更新" in exporter_src, True))
+
     # 4) stale 阈值
     m = re.search(r"EI_STALE_HOURS[^\d]*(\d+)", readme)
     if m:

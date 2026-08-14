@@ -232,7 +232,7 @@ class SiteExporter:
                 "journal": sum(1 for p in roots if p.paper_type == "journal"),
                 "working": sum(1 for p in roots if p.paper_type != "journal"),
             },
-            "update_schedule": "每天北京时间 08:00 自动更新",
+            "update_schedule": "每 6 小时自动更新",
         }
         self._write_js("data/meta.js", "window.EI_META = " + _json(meta) + ";")
 

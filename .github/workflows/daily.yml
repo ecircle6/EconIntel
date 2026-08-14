@@ -1,6 +1,6 @@
-# EconIntel 每日自动更新：主任务 + 兜底任务 + 部署自检
-# 主任务：每日 00:00 UTC（= 北京时间 08:00）采集 → 生成站点 → 部署 gh-pages → 提交 DB 备份
-# 兜底任务：每日 04:00 UTC（= 北京 12:00）检查今日是否已生成，未生成则补跑
+# EconIntel 自动更新：主任务 + 部署自检
+# 主任务：每 6 小时（cron "0 */6 * * *" = 北京 2/8/14/20 点）采集 → 生成站点 → 部署 gh-pages → 提交 DB 备份
+# push/workflow_dispatch：--force 强制重建；schedule：--if-stale 防重复
 # 自检任务：部署后 curl 校验 URL 返回 200，失败即邮件告警
 name: econintel-daily
 
