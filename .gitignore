@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 本地环境
+.env
+
+# 工具目录
+.zcode/
+
+# 生成产物（site/ 由 Actions 构建部署，不提交；离线单文件版也由构建生成）
+site/
+*.db-shm
+*.db-wal
+
+# 注意：generator/data/*.db 需要提交（备份），因此不忽略 .db 本身

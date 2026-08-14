@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EconIntel · 经济学前沿论文</title>
+<link rel="stylesheet" href="css/style.css?v=__VERSION__">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">📈 EconIntel<span class="brand-sub">经济学前沿论文聚合</span></div>
+  <nav class="nav">
+    <a href="#/">论文</a>
+    <a href="#/scholars">学者</a>
+    <a href="#/subs">订阅</a>
+    <a href="#/status">状态</a>
+  </nav>
+</header>
+
+<section class="toolbar" id="toolbar">
+  <input id="f-q" class="tb-search" type="search" placeholder="搜索标题 / 作者 / 关键词…">
+  <select id="f-field"><option>全部领域</option></select>
+  <select id="f-source"><option>全部来源</option></select>
+  <select id="f-type">
+    <option value="全部">全部类型</option>
+    <option value="工作论文">工作论文</option>
+    <option value="期刊论文">期刊论文</option>
+  </select>
+  <select id="f-range">
+    <option value="1">今天</option>
+    <option value="7">近 7 天</option>
+    <option value="30" selected>近 30 天</option>
+    <option value="90">全部（90 天）</option>
+  </select>
+  <select id="f-imp">
+    <option value="全部">全部重要性</option>
+    <option value="🔥热点">🔥 热点</option>
+    <option value="⭐重要">⭐ 重要</option>
+    <option value="📄普通">📄 普通</option>
+  </select>
+  <select id="f-sort">
+    <option value="score" selected>按重要性</option>
+    <option value="date">按时间</option>
+  </select>
+  <div class="view-toggle">
+    <button id="view-card" class="active" title="卡片视图">▦</button>
+    <button id="view-list" title="列表视图">☰</button>
+  </div>
+</section>
+
+<div id="range-note" class="range-note"></div>
+<main id="app" class="container"></main>
+
+<footer class="footer">
+  <span>数据更新于 <b id="f-updated">-</b></span>
+  <span id="f-window"></span>
+  <span>· 每日北京时间 08:00 自动更新</span>
+</footer>
+
+<div id="modal-root"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+window.EI_CONFIG = {"version":"__VERSION__","blocks":__BLOCKS__,"history_days":__HISTORY_DAYS__};
+</script>
+<script src="data/meta.js?v=__VERSION__"></script>
+<script src="js/app.js?v=__VERSION__"></script>
+<script src="js/papers.js?v=__VERSION__"></script>
+<script src="js/scholars.js?v=__VERSION__"></script>
+<script src="js/subs.js?v=__VERSION__"></script>
+<script src="js/status.js?v=__VERSION__"></script>
+<script>App.init();</script>
+</body>
+</html>

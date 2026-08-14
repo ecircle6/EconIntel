@@ -1,0 +1,85 @@
+# EconIntel 每日自动更新：主任务 + 兜底任务 + 部署自检
+# 主任务：每日 00:00 UTC（= 北京时间 08:00）采集 → 生成站点 → 部署 gh-pages → 提交 DB 备份
+# 兜底任务：每日 04:00 UTC（= 北京 12:00）检查今日是否已生成，未生成则补跑
+# 自检任务：部署后 curl 校验 URL 返回 200，失败即邮件告警
+name: econintel-daily
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # 北京时间 08:00
+    - cron: "0 4 * * *"   # 北京时间 12:00（兜底）
+  workflow_dispatch:      # 支持手动触发
+
+permissions:
+  contents: write         # 提交 SQLite 备份
+  pages: write            # 部署 gh-pages
+  id-token: write
+
+concurrency:
+  group: econintel-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: 安装依赖
+        run: pip install --quiet -r requirements.txt
+
+      - name: 采集 → 处理 → 生成站点
+        id: run
+        env:
+          EI_LLM_API_KEY: ${{ secrets.EI_LLM_API_KEY }}   # 可选；未配置自动降级为规则算法
+          EI_LLM_BASE_URL: ${{ secrets.EI_LLM_BASE_URL }}
+          EI_LLM_MODEL: ${{ secrets.EI_LLM_MODEL }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python generator/scripts/daily.py --force > /tmp/run.log 2>&1
+          else
+            python generator/scripts/daily.py --if-stale > /tmp/run.log 2>&1
+          fi
+          tail -30 /tmp/run.log
+          if grep -q "RESULT=OK" /tmp/run.log; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 提交 SQLite 数据库备份
+        if: steps.run.outputs.ok == 'true'
+        run: |
+          git config user.name "econintel-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add generator/data
+          git diff --cached --quiet || (git commit -m "chore: 每日数据更新 $(date -u +%Y-%m-%d)" && git push)
+
+      - name: 上传站点产物
+        if: steps.run.outputs.ok == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: 部署到 GitHub Pages
+        if: steps.run.outputs.ok == 'true'
+        uses: actions/deploy-pages@v4
+
+  healthcheck:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' || always()
+    steps:
+      - name: 校验部署 URL 可访问
+        run: |
+          url="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+          for i in 1 2 3 4 5 6 7 8; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$url")
+            echo "attempt $i: HTTP $code"
+            [ "$code" = "200" ] && echo "部署自检通过 ✅ $url" && exit 0
+            sleep 20
+          done
+          echo "部署自检失败 ❌ $url"
+          exit 1
