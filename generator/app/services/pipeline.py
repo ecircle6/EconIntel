@@ -213,6 +213,7 @@ class Pipeline:
                     p.abstract, p.abstract_source = r["abstract"], r["abstract_source"]
                 if "citations" in r:
                     p.citations = r["citations"]
+                    p.citation_source = r.get("citation_source", "")
                 stats["enriched"] += 1
                 p.enriched_at = now
             session.commit()
@@ -222,7 +223,7 @@ class Pipeline:
             if not p.field or (p.enriched_at and p.updated_at < p.enriched_at):
                 p.field = classify(p.title_original, p.abstract)
 
-        # 3) 重要性评分（全窗口重算，内存内秒级）
+        # 3) 重要性评分（全窗口重算，内存内秒级；保留 1 位小数，详情页可查构成）
         today = datetime.utcnow()
         for p in papers:
             p.importance_score = importance.compute_score(

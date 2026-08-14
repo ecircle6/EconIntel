@@ -27,7 +27,8 @@ class Paper(Base):
     collected_at = Column(DateTime, default=datetime.utcnow)
     url_original = Column(Text, default="")
     citations = Column(Integer, nullable=True)              # 引用数（未知为 None）
-    importance_score = Column(Integer, default=0)           # 0-100
+    citation_source = Column(String(16), default="")        # 引用数来源：crossref/openalex/s2
+    importance_score = Column(Float, default=0.0)           # 0-100（1 位小数）
     importance_label = Column(String(8), default="📄普通")
     field = Column(String(32), default="")                  # 研究领域（中文）
     credibility = Column(String(1), default="B")            # A 官方 / B 学术数据库 / C 预印本

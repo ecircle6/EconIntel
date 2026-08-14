@@ -92,15 +92,22 @@ class Enricher:
                 out["abstract"], out["abstract_source"] = abstract, "s2"
 
         if need_cites and time.monotonic() < deadline:
-            cites = None
+            cites, source = None, ""
             if paper.doi:
                 cites = self._crossref_citations(paper.doi)  # CrossRef 免费无限，主路径
+                if cites is not None:
+                    source = "crossref"
             if cites is None and time.monotonic() < deadline and self._api_ok("openalex"):
                 cites = self._openalex_citations(paper, deadline)
+                if cites is not None:
+                    source = "openalex"
             if cites is None and time.monotonic() < deadline and self._api_ok("s2"):
                 cites = self._s2_citations(paper, deadline)
+                if cites is not None:
+                    source = "s2"
             if cites is not None:
                 out["citations"] = cites
+                out["citation_source"] = source
         return out
 
     def _api_ok(self, name: str) -> bool:
@@ -205,8 +212,30 @@ class Enricher:
 
     # ---- OpenAlex（每日额度有限）----
 
+    @staticmethod
+    def _title_matches(title: str, work_title: str) -> bool:
+        """标题模糊匹配校验：token 重叠率 ≥ 0.5 才认定同一篇（防同名旧论文误配）。"""
+        if not title or not work_title:
+            return False
+        import re
+        import unicodedata
+
+        def norm(t):
+            t = unicodedata.normalize("NFKD", t).lower()
+            return set(re.findall(r"[a-z0-9]+", t))
+
+        s1, s2 = norm(title), norm(work_title)
+        if not s1 or not s2:
+            return False
+        return len(s1 & s2) / len(s1) >= 0.5
+
     def _openalex_find(self, paper, deadline=None):
-        """返回 OpenAlex work dict 或 None：优先 DOI 精确匹配，失败标题检索。"""
+        """返回 OpenAlex work dict 或 None。
+
+        - DOI 精确匹配：权威标识，直接采纳；
+        - 标题检索：必须通过标题相似度校验（token 重叠 ≥ 0.5），
+          且 work 发表年份与论文年份差 ≤ 2（防同名旧论文误配引用数）。
+        """
         if paper.doi:
             try:
                 r = self._openalex_get(f"https://api.openalex.org/works/https://doi.org/{quote(paper.doi, safe='')}", deadline=deadline)
@@ -218,11 +247,19 @@ class Enricher:
             return None
         try:
             r = self._openalex_get("https://api.openalex.org/works",
-                                   {"search": paper.title_original[:200], "per-page": 1}, deadline=deadline)
+                                   {"search": paper.title_original[:200], "per-page": 3}, deadline=deadline)
             if r is not None and r.status_code == 200:
                 results = r.json().get("results") or []
-                if results:
-                    return results[0]
+                paper_year = paper.published_at.year if paper.published_at else None
+                for w in results:
+                    wt = w.get("title") or ""
+                    if not self._title_matches(paper.title_original, wt):
+                        continue
+                    if paper_year:
+                        wy = w.get("publication_year")
+                        if wy and abs(int(wy) - paper_year) > 2:
+                            continue  # 年份差异过大，判定为同名论文
+                    return w
         except Exception:
             pass
         return None
@@ -255,21 +292,25 @@ class Enricher:
 
     # ---- Semantic Scholar（限速）----
 
-    def _s2_abstract(self, paper, deadline=None):
-        r = self._s2_call({"query": paper.title_original[:200], "fields": "title,abstract", "limit": 1}, deadline)
+    def _s2_find(self, paper, fields, deadline=None):
+        """S2 标题检索 + 标题相似度校验（防同名误配）。"""
+        r = self._s2_call({"query": paper.title_original[:200], "fields": fields, "limit": 3}, deadline)
         if r is None or r.status_code != 200:
             return None
-        data = r.json().get("data") or []
-        if not data:
+        for d in r.json().get("data") or []:
+            if self._title_matches(paper.title_original, d.get("title") or ""):
+                return d
+        return None
+
+    def _s2_abstract(self, paper, deadline=None):
+        d = self._s2_find(paper, "title,abstract", deadline)
+        if not d:
             return None
-        return data[0].get("abstract") or None
+        return d.get("abstract") or None
 
     def _s2_citations(self, paper, deadline=None):
-        r = self._s2_call({"query": paper.title_original[:200], "fields": "title,citationCount", "limit": 1}, deadline)
-        if r is None or r.status_code != 200:
+        d = self._s2_find(paper, "title,citationCount", deadline)
+        if not d:
             return None
-        data = r.json().get("data") or []
-        if not data:
-            return None
-        c = data[0].get("citationCount")
+        c = d.get("citationCount")
         return int(c) if isinstance(c, (int, float)) else None

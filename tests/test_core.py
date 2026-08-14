@@ -67,7 +67,7 @@ class TestImportance(unittest.TestCase):
     TODAY = datetime(2026, 8, 14)
 
     def test_fresh_hot(self):
-        # A 官方机构 + 期刊 + 100 引用 + 近 3 天 → 🔥热点
+        # A 官方机构 + 期刊 + 100 引用（满分档）+ 近 3 天 → 🔥热点
         score = compute_score("A", "journal", 100, self.TODAY - timedelta(days=3), self.TODAY, self.W)
         self.assertGreaterEqual(score, 80)
         self.assertEqual(label_for(score), "🔥热点")
@@ -82,6 +82,27 @@ class TestImportance(unittest.TestCase):
         score = compute_score("A", "working", 0, self.TODAY - timedelta(days=3), self.TODAY, self.W)
         self.assertGreaterEqual(score, 60)
         self.assertEqual(label_for(score), "⭐重要")
+
+    def test_citation_differentiation(self):
+        # 0-100 引用区间应有区分度（log1p 映射，5 vs 50 引用不同分；100+ 饱和为设计）
+        s_low = compute_score("A", "working", 5, self.TODAY, self.TODAY, self.W)
+        s_mid = compute_score("A", "working", 50, self.TODAY, self.TODAY, self.W)
+        s_high = compute_score("A", "working", 500, self.TODAY, self.TODAY, self.W)
+        self.assertGreater(s_mid, s_low)
+        self.assertGreater(s_high, s_mid)
+
+    def test_score_has_decimal(self):
+        score = compute_score("A", "journal", 33, self.TODAY - timedelta(days=12), self.TODAY, self.W)
+        self.assertIsInstance(score, float)
+        self.assertGreaterEqual(score, 80)  # 高分段仍可达
+
+    def test_breakdown_transparency(self):
+        from app.processors.importance import score_breakdown
+
+        bd = score_breakdown("A", "journal", 50, self.TODAY, self.TODAY, self.W)
+        self.assertEqual(bd["institution"], 32.0)
+        self.assertAlmostEqual(bd["total"], bd["institution"] + bd["citations"] + bd["recency"] + bd["paper_type"])
+        self.assertLessEqual(bd["total"], 100.0)
 
     def test_never_exceeds_100(self):
         score = compute_score("A", "journal", 10**6, self.TODAY, self.TODAY, self.W)

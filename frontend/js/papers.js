@@ -128,6 +128,23 @@ function renderModal(d) {
       "</div>";
   }).join("");
 
+  // 评分构成（透明展示）
+  var bd = d.bd;
+  var scoreHtml = "";
+  if (bd) {
+    var citeNote = d.ct == null
+      ? "引用数未知（按 0 计）"
+      : "引用 " + d.ct + "（来源：" + (d.cs === "crossref" ? "CrossRef" : d.cs === "openalex" ? "OpenAlex" : d.cs === "s2" ? "Semantic Scholar" : "未知") + "）";
+    scoreHtml =
+      '<div class="m-section"><h4>重要性评分构成（' + Math.round(d.s) + " / 100）</h4>" +
+      '<div class="m-meta">' +
+      "<span>机构权威</span><span><b>" + bd.institution + " 分</b>（" + (d.cr === "A" ? "A 官方机构" : d.cr === "B" ? "B 学术数据库" : "C 预印本") + "）</span>" +
+      "<span>引用数</span><span><b>" + bd.citations + " 分</b>（" + citeNote + "）</span>" +
+      "<span>时效性</span><span><b>" + bd.recency + " 分</b>（发布于 " + d.d + "）</span>" +
+      "<span>论文类型</span><span><b>" + bd.paper_type + " 分</b>（" + (d.ty === "jr" ? "期刊论文" : "工作论文") + "）</span>" +
+      "</div></div>";
+  }
+
   var maskHtml =
     '<div class="modal">' +
     '<button class="m-close" title="关闭">×</button>' +
@@ -139,6 +156,7 @@ function renderModal(d) {
     '<h2 class="m-title">' + esc(d.t) + "</h2>" +
     (d.st && d.st !== d.t ? '<span class="m-short">精简：' + esc(d.st) + "</span>" : "") +
     (d.c ? '<div class="m-section"><h4>核心贡献</h4><p>' + esc(d.c) + "</p></div>" : "") +
+    scoreHtml +
     '<div class="m-section"><h4>摘要</h4><div class="m-abs">' + absHtml + "</div></div>" +
     '<div class="m-section"><div class="m-meta">' +
     (authors ? "<span>作者</span><span><b>" + esc(authors) + "</b></span>" : "") +

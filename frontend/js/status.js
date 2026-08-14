@@ -28,6 +28,19 @@ Pages.status = function () {
   });
   app.appendChild(kpi);
 
+  // 评分分布说明
+  var total = t.papers || 1;
+  var dist = el("div", "sub-box");
+  dist.innerHTML =
+    "<h3>评分分布（0-100）</h3>" +
+    '<div class="m-meta" style="margin-top:8px">' +
+    "<span>🔥 热点（≥80）</span><span>" + (t.hot || 0) + " 篇（" + Math.round((t.hot || 0) / total * 100) + "%）</span>" +
+    "<span>⭐ 重要（60-79）</span><span>" + (t.important || 0) + " 篇（" + Math.round((t.important || 0) / total * 100) + "%）</span>" +
+    "<span>📄 普通（&lt;60）</span><span>" + (total - (t.hot || 0) - (t.important || 0)) + " 篇</span>" +
+    "<span>评分依据</span><span>机构权威 + 引用数（CrossRef/OpenAlex/S2 真实计数，未知按 0 并标注）+ 时效衰减 + 论文类型；权重与公式见 README</span>" +
+    "</div>";
+  app.appendChild(dist);
+
   // 源健康表
   var table = el("table", "status-table");
   table.innerHTML =

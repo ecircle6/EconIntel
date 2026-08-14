@@ -50,9 +50,10 @@ function loadScript(url, cb) {
   document.head.appendChild(s);
 }
 function badgeHtml(p) {
-  var cls = p.s >= 80 ? "l-hot" : p.s >= 60 ? "l-imp" : "l-norm";
-  var icon = p.s >= 80 ? "🔥" : p.s >= 60 ? "⭐" : "📄";
-  return '<span class="badge ' + cls + '">' + icon + " " + p.s + "</span>";
+  var score = Math.round(p.s);
+  var cls = score >= 80 ? "l-hot" : score >= 60 ? "l-imp" : "l-norm";
+  var icon = score >= 80 ? "🔥" : score >= 60 ? "⭐" : "📄";
+  return '<span class="badge ' + cls + '">' + icon + " " + score + "</span>";
 }
 
 /* ---------- 分片加载 ---------- */

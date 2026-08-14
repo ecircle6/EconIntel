@@ -82,6 +82,7 @@ class SiteExporter:
             group_map.setdefault(p.version_group, []).append(p)
         self._group_map = group_map
         self._registry = REGISTRY
+        self._weights = self.cfg.importance_weights
 
         index, detail = self._split_blocks(roots, blocks)
         self._write_meta(session, roots, blocks, window_start)
@@ -128,7 +129,13 @@ class SiteExporter:
         }
 
     def _detail_entry(self, p, members) -> dict:
+        from ..processors.importance import score_breakdown
+
         abstract = (p.abstract or "")[:600]
+        bd = score_breakdown(
+            p.credibility, p.paper_type, p.citations, p.published_at,
+            self.today, self._weights,
+        )
         return {
             "id": p.id,
             "t": p.title_original,
@@ -147,8 +154,10 @@ class SiteExporter:
             "doi": p.doi or "",
             "url": p.url_original or "",
             "ct": p.citations,
+            "cs": p.citation_source or "",
             "cr": p.credibility,
             "as": p.abstract_source or "",
+            "bd": bd,  # 评分构成（详情页透明展示）
             "vs": self._versions(p, members),
         }
 
