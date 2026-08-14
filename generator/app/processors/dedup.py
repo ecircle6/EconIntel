@@ -102,12 +102,15 @@ class GroupMatcher:
 
 
 def choose_root(group_papers: list) -> Paper:
-    """组内选主展示版：期刊版优先；同类取发布时间最新。"""
+    """组内选主展示版：期刊版 > 来源权威度(A>B>C) > 发布时间最新。"""
     if not group_papers:
         return None
-    journals = [p for p in group_papers if p.paper_type == "journal"]
-    pool = journals or group_papers
-    return max(pool, key=lambda p: p.published_at or p.collected_at)
+
+    def key(p):
+        cred = {"A": 3, "B": 2, "C": 1}.get(p.credibility, 0)
+        return (1 if p.paper_type == "journal" else 0, cred, p.published_at or p.collected_at)
+
+    return max(group_papers, key=key)
 
 
 def sync_group_roles(session, group_id: str) -> None:

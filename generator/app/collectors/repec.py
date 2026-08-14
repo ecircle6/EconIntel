@@ -17,7 +17,8 @@ from bs4 import BeautifulSoup
 from .base import BaseCollector, PaperDraft, clean_text, split_authors
 
 DATE_RE = re.compile(r"Date:\s*(\d{4}(?:-\d{1,2})?)", re.IGNORECASE)
-ABSTRACT_RE = re.compile(r"Abstract:\s*(.*?)(?=\s*(?:Keywords|Date|Note)\s*:|$)", re.DOTALL | re.IGNORECASE)
+# 兼容 "Abstract: ..."（EconPapers）与 "Abstract ..."（IDEAS，无冒号）
+ABSTRACT_RE = re.compile(r"Abstract:?\s*(.*?)(?=\s*(?:Keywords|Date|Note)\s*:?|$)", re.DOTALL | re.IGNORECASE)
 
 
 def _parse_month_date(text: str) -> datetime | None:
@@ -54,7 +55,7 @@ class RepecSeriesCollector(BaseCollector):
             url = f"https://ideas.repec.org/s/{series}.html" if page_no == 1 else f"https://ideas.repec.org/s/{series}{page_no}.html"
             resp = self.session.get(url, timeout=self.timeout)
             resp.raise_for_status()
-            page_entries = self._parse_listing(resp.text)
+            page_entries = self._parse_listing(resp.content)
             if not page_entries:
                 break
             entries.extend(page_entries)
@@ -70,16 +71,17 @@ class RepecSeriesCollector(BaseCollector):
             seen.add(num)
             uniq.append((num, title, authors, year))
 
-        # 并发抓详情页：摘要 + 月份日期
+        # 并发抓详情页：摘要 + 月份日期（EconPapers 主源；404 时回退 IDEAS 页，日期用系列年份兜底）
         drafts = []
         with ThreadPoolExecutor(max_workers=self.entry.get("workers", 6)) as pool:
             futures = {}
             for num, title, authors, year in uniq:
                 if year < start_year:
                     continue
-                detail_url = f"https://econpapers.repec.org/paper/{short}/{num}.htm"
-                futures[pool.submit(self._fetch_detail, detail_url)] = (num, title, authors)
-            for fut, (num, title, authors) in futures.items():
+                ep_url = f"https://econpapers.repec.org/paper/{short}/{num}.htm"
+                ideas_url = f"https://ideas.repec.org/p/{series}/{num}.html"
+                futures[pool.submit(self._fetch_detail, ep_url, ideas_url, year)] = (num, title, authors, year)
+            for fut, (num, title, authors, year) in futures.items():
                 try:
                     abstract, published = fut.result()
                 except Exception:
@@ -124,18 +126,36 @@ class RepecSeriesCollector(BaseCollector):
             entries.append((num, title, authors, year))
         return entries
 
-    def _fetch_detail(self, url: str):
-        """EconPapers 详情页：返回 (abstract, published)。失败返回 (None, None)。"""
+    def _fetch_detail(self, ep_url: str, ideas_url: str, year: int):
+        """双镜像详情页：返回 (abstract, published)。
+
+        EconPapers 有月份级日期但部分系列未镜像（如 IMF）；IDEAS 有摘要但无日期。
+        摘要取任一来源；日期 EconPapers 优先，缺失用系列年份年中兜底。
+        """
+        abstract, published = None, None
         try:
-            resp = self.session.get(url, timeout=self.timeout)
-            resp.raise_for_status()
+            resp = self.session.get(ep_url, timeout=self.timeout)
+            if resp.status_code == 200:
+                text = BeautifulSoup(resp.content, "html.parser").get_text(" ")
+                text = re.sub(r"\s+", " ", text)
+                abstract = _parse_abstract(text) or None
+                published = _parse_month_date(text)
         except Exception:
-            return None, None
-        text = BeautifulSoup(resp.text, "html.parser").get_text(" ")
-        text = re.sub(r"\s+", " ", text)
-        abstract = _parse_abstract(text)
-        published = _parse_month_date(text)
-        return (abstract or None), published
+            pass
+        if not abstract:
+            try:
+                resp = self.session.get(ideas_url, timeout=self.timeout)
+                if resp.status_code == 200:
+                    text = BeautifulSoup(resp.content, "html.parser").get_text(" ")
+                    text = re.sub(r"\s+", " ", text)
+                    abstract = _parse_abstract(text) or None
+            except Exception:
+                pass
+        if published is None and year:
+            # 月份缺失时兜底：当年「今天」的近似日期（避免被窗口过滤误杀；跨年论文自然落入上年）
+            today = datetime.now()
+            published = datetime(min(year, today.year), today.month, today.day)
+        return abstract, published
 
 
 class NEPCollector(BaseCollector):
@@ -164,7 +184,7 @@ class NEPCollector(BaseCollector):
         """主题页归档 → 最近 k 期日期（新→旧）。"""
         resp = self.session.get(f"https://nep.repec.org/{topic}.html", timeout=self.timeout)
         resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
+        soup = BeautifulSoup(resp.content, "html.parser")
         dates = []
         for a in soup.select(f'a[href^="/{topic}/"]'):
             href = a["href"]
@@ -176,41 +196,59 @@ class NEPCollector(BaseCollector):
     def _fetch_issue(self, topic: str, date_str: str) -> list:
         resp = self.session.get(f"https://nep.repec.org/{topic}/{date_str}", timeout=self.timeout)
         resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        published = datetime.strptime(date_str, "%Y-%m-%d")
+        soup = BeautifulSoup(resp.content, "html.parser")  # content：自动识别 UTF-8
         drafts = []
-        # 论文条目锚点：id="pN"（排除页面其他 id 干扰）
+        # 条目结构：<div id="pN">标题链接</div> + 紧邻 <table class="basit"> 明细表
+        # （By / Abstract / Keywords / JEL / Date / URL 行）
         for div in soup.select("div[id]"):
             if not re.fullmatch(r"p\d+", div.get("id", "")):
                 continue
-            a = div.find("a", href=re.compile(r"econpapers\.repec\.org/RePEc:"))
             a = div.find("a", href=re.compile(r"econpapers\.repec\.org/RePEc:"))
             if not a:
                 continue
             title = clean_text(a.get_text())
             if not title:
                 continue
-            handle = a["href"].split("RePEc:")[-1].split("?")[0]  # e.g. drm:wpaper:2026-16
-            authors = []
-            abstract = ""
-            for td in div.select("td.fiva"):
-                label = td.find_previous_sibling("td")
-                lbl = clean_text(label.get_text()) if label else ""
-                if lbl.startswith("By"):
-                    authors = split_authors(td.get_text("; "))
-                elif lbl.startswith("Abstract"):
-                    abstract = clean_text(td.get_text(" "))
-            path = handle.replace(":", "/")
+            handle = a["href"].split("RePEc:")[-1].split("?")[0]  # e.g. cpr:ceprdp:21842
+            authors, abstract, jel, published, url_original = [], "", [], None, None
+            table = div.find_next_sibling("table")
+            if table:
+                for tr in table.select("tr"):
+                    cells = tr.select("td")
+                    if len(cells) < 2:
+                        continue
+                    label = clean_text(cells[0].get_text())
+                    value = cells[1].get_text("; ")
+                    if label.startswith("By"):
+                        authors = [re.sub(r"\s*\(.*?\)\s*$", "", a) for a in split_authors(value)]
+                    elif label.startswith("Abstract"):
+                        abstract = clean_text(value)
+                    elif label.startswith("JEL"):
+                        jel = re.findall(r"[A-Z]\d{2}", value)  # 只取标准 JEL 码（如 E52）
+                    elif label.startswith("Date"):
+                        m = re.search(r"(\d{4})\s*[–-]\s*(\d{1,2})", value)
+                        if m:
+                            try:
+                                published = datetime(int(m.group(1)), min(max(int(m.group(2)), 1), 12), 1)
+                            except ValueError:
+                                published = None
+                    elif label.startswith("URL"):
+                        hm = re.search(r"RePEc:([\w.:/-]+)", value)
+                        if hm:
+                            url_original = f"https://ideas.repec.org/p/{hm.group(1).replace(':', '/')}.html"
+            if not url_original:
+                url_original = f"https://ideas.repec.org/p/{handle.replace(':', '/')}.html"
             drafts.append(
                 PaperDraft(
                     title=title,
                     authors=authors,
-                    url=f"https://ideas.repec.org/p/{path}.html",
+                    url=url_original,
                     published=published,
                     source=self.key,
                     paper_type="working",
                     abstract=abstract or None,
                     abstract_source="source" if abstract else None,
+                    jel=jel,
                 )
             )
         return drafts

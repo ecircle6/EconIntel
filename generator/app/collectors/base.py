@@ -33,6 +33,7 @@ class PaperDraft:
     doi: Optional[str] = None
     abstract: Optional[str] = None
     abstract_source: Optional[str] = None  # 摘要来源（source 表示源自数据源本身）
+    jel: list = field(default_factory=list)  # 数据源自带的 JEL 码（如 NEP）
 
 
 class FetchError(Exception):

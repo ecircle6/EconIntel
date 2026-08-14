@@ -95,6 +95,7 @@ def summarize_paper(cfg, paper, llm_client=None) -> bool:
     paper.title_short = (result["short_title"] or paper.title_original)[:60]
     paper.contribution = result["contribution"]
     paper.keywords = result["keywords"]
-    paper.jel = result["jel"]
+    if not paper.jel and result.get("jel"):  # 数据源自带 JEL（如 NEP）优先保留
+        paper.jel = result["jel"]
     paper.summarized_at = datetime.utcnow()
     return used_llm

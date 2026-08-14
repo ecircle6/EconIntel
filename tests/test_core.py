@@ -48,19 +48,27 @@ class TestDedup(unittest.TestCase):
     def test_choose_root_prefers_journal(self):
         from types import SimpleNamespace
 
-        wp = SimpleNamespace(paper_type="working", published_at=datetime(2026, 7, 1), id=1)
-        jr = SimpleNamespace(paper_type="journal", published_at=datetime(2026, 8, 1), id=2)
-        self.assertEqual(choose_root([wp, jr]).id, 2)
-        newer = SimpleNamespace(paper_type="working", published_at=datetime(2026, 8, 10), id=3)
-        self.assertEqual(choose_root([wp, newer]).id, 3)
+        wp = SimpleNamespace(paper_type="working", published_at=datetime(2026, 7, 1), id=1, credibility="A")
+        jr = SimpleNamespace(paper_type="journal", published_at=datetime(2026, 8, 1), id=2, credibility="B")
+        self.assertEqual(choose_root([wp, jr]).id, 2)  # 期刊版优先
+        newer = SimpleNamespace(paper_type="working", published_at=datetime(2026, 8, 10), id=3, credibility="A")
+        self.assertEqual(choose_root([wp, newer]).id, 3)  # 同类取最新
+
+    def test_choose_root_prefers_higher_credibility(self):
+        from types import SimpleNamespace
+
+        b_src = SimpleNamespace(paper_type="working", published_at=datetime(2026, 8, 10), id=1, credibility="B")
+        a_src = SimpleNamespace(paper_type="working", published_at=datetime(2026, 8, 1), id=2, credibility="A")
+        self.assertEqual(choose_root([b_src, a_src]).id, 2)  # A 官方机构优先于 B
 
 
 class TestImportance(unittest.TestCase):
-    W = {"institution": 25, "citations": 45, "recency": 24, "paper_type": 6}
+    W = {"institution": 32, "citations": 30, "recency": 26, "paper_type": 12}
     TODAY = datetime(2026, 8, 14)
 
     def test_fresh_hot(self):
-        score = compute_score("A", "working", 100, self.TODAY - timedelta(days=3), self.TODAY, self.W)
+        # A 官方机构 + 期刊 + 100 引用 + 近 3 天 → 🔥热点
+        score = compute_score("A", "journal", 100, self.TODAY - timedelta(days=3), self.TODAY, self.W)
         self.assertGreaterEqual(score, 80)
         self.assertEqual(label_for(score), "🔥热点")
 
@@ -69,11 +77,10 @@ class TestImportance(unittest.TestCase):
         self.assertLess(score, 60)
         self.assertEqual(label_for(score), "📄普通")
 
-    def test_mid_band(self):
-        # A 官方机构 + 期刊 + 30 引用 + 近 10 天 → ⭐重要
-        score = compute_score("A", "journal", 30, self.TODAY - timedelta(days=10), self.TODAY, self.W)
+    def test_fresh_a_authority_reaches_star(self):
+        # A 机构最新工作论文（无引用）也应达到 ⭐（顶级机构新论文有区分度）
+        score = compute_score("A", "working", 0, self.TODAY - timedelta(days=3), self.TODAY, self.W)
         self.assertGreaterEqual(score, 60)
-        self.assertLess(score, 80)
         self.assertEqual(label_for(score), "⭐重要")
 
     def test_never_exceeds_100(self):

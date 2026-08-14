@@ -20,6 +20,8 @@ from ..processors.summarize import summarize_paper
 
 log = logging.getLogger("econintel.pipeline")
 
+_CRED_RANK = {"A": 3, "B": 2, "C": 1}  # 来源权威度（用于同记录多源命中时的归属）
+
 
 class Pipeline:
     def __init__(self, cfg):
@@ -144,6 +146,7 @@ class Pipeline:
                     paper_type=d.paper_type,
                     abstract=d.abstract or "",
                     abstract_source=d.abstract_source or ("source" if d.abstract else ""),
+                    jel=d.jel or [],
                     credibility=next((s["credibility"] for s in SOURCES if s["key"] == d.source), "B"),
                     collected_at=now,
                     version_group=group_id,
@@ -160,6 +163,7 @@ class Pipeline:
                     paper_type=d.paper_type,
                     abstract=d.abstract or "",
                     abstract_source=d.abstract_source or ("source" if d.abstract else ""),
+                    jel=d.jel or [],
                     credibility=next((s["credibility"] for s in SOURCES if s["key"] == d.source), "B"),
                     collected_at=now,
                     version_group=group_id,
@@ -184,12 +188,19 @@ class Pipeline:
         if d.abstract and not paper.abstract:
             paper.abstract = d.abstract
             paper.abstract_source = d.abstract_source or "source"
+        # 来源归属：同一记录被多源命中时，权威度更高者优先（A官方 > B学术库 > C预印本）
+        draft_cred = next((s["credibility"] for s in SOURCES if s["key"] == d.source), "B")
+        if _CRED_RANK.get(draft_cred, 0) > _CRED_RANK.get(paper.credibility, 0):
+            paper.source = d.source
+            paper.credibility = draft_cred
 
     def _post_process(self, session, stats) -> dict:
         """富化 → 领域分类 → 评分 → 精简。"""
-        # 1) 富化：仅处理 缺摘要 或 缺引用 的论文（增量缓存）
+        # 1) 富化：仅处理 缺摘要 或 缺引用 的论文（增量缓存；每轮限量，最新论文优先，剩余下轮自动补）
         papers = session.execute(select(Paper)).scalars().all()
         need_enrich = [p for p in papers if (not p.abstract or p.citations is None)]
+        need_enrich.sort(key=lambda p: p.published_at or datetime.min, reverse=True)
+        need_enrich = need_enrich[: self.cfg.enrich_max_papers]
         if need_enrich:
             enricher = Enricher(self.cfg)
             results = enricher.enrich(need_enrich)

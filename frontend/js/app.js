@@ -139,7 +139,7 @@ function route() {
   if (hash.indexOf("#/scholars") === 0) Pages.scholars();
   else if (hash.indexOf("#/subs") === 0) Pages.subs();
   else if (hash.indexOf("#/status") === 0) Pages.status();
-  else Pages.papers();
+  else Pages.renderPapers();
 }
 
 /* ---------- 初始化 ---------- */

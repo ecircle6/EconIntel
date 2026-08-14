@@ -54,7 +54,8 @@ class Config:
         self.request_timeout = _env_float("EI_REQUEST_TIMEOUT", 8.0)
         self.series_workers = _env_int("EI_SERIES_WORKERS", 6)       # RePEc 系列详情并发
         self.enrich_workers = _env_int("EI_ENRICH_WORKERS", 8)       # 富化总并发
-        self.s2_min_interval = _env_float("EI_S2_MIN_INTERVAL", 1.2)  # Semantic Scholar 限速（秒）
+        self.enrich_max_papers = _env_int("EI_ENRICH_MAX_PAPERS", 600)  # 每轮富化上限（新→旧，剩余下轮补）
+        self.s2_min_interval = _env_float("EI_S2_MIN_INTERVAL", 3.2)  # Semantic Scholar 限速（秒，未认证 ≥3.2）
         self.openalex_min_interval = _env_float("EI_OPENALEX_MIN_INTERVAL", 0.25)  # OpenAlex 限速（秒/请求）
         self.openalex_mailto = _env("EI_OPENALEX_MAILTO")            # 填邮箱进 polite pool（10rps 专属）
         self.paper_budget = _env_float("EI_PAPER_BUDGET", 20.0)      # 单篇富化总预算
@@ -65,10 +66,10 @@ class Config:
         self.llm_timeout = _env_float("EI_LLM_TIMEOUT", 60.0)
         # ---- 重要性评分权重（合计 100）----
         self.importance_weights = {
-            "institution": _env_int("EI_W_INSTITUTION", 25),  # 机构权威（A/B/C 内再分级）
-            "citations": _env_int("EI_W_CITATIONS", 45),      # 引用数（对数归一化）
-            "recency": _env_int("EI_W_RECENCY", 24),          # 时效性（分段）
-            "paper_type": _env_int("EI_W_TYPE", 6),           # 论文类型（期刊加分）
+            "institution": _env_int("EI_W_INSTITUTION", 32),  # 机构权威（A/B/C 内再分级）
+            "citations": _env_int("EI_W_CITATIONS", 30),      # 引用数（对数归一化）
+            "recency": _env_int("EI_W_RECENCY", 26),          # 时效性（分段）
+            "paper_type": _env_int("EI_W_TYPE", 12),          # 论文类型（期刊加分）
         }
 
     @property
