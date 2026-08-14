@@ -32,7 +32,7 @@ class Pipeline:
 
     def run(self, full: bool = False, if_stale: bool = False) -> dict:
         """执行一轮完整更新。full=True 表示首跑全量回填；if_stale=True 今日已跑则跳过。"""
-        if if_stale and self._ran_today():
+        if if_stale and self._ran_recently(self.cfg.stale_hours):
             return {"skipped": True}
         session = get_session()
         stats = {
@@ -252,15 +252,17 @@ class Pipeline:
 
     # ---- 元信息辅助 ----
 
-    def _ran_today(self) -> bool:
+    def _ran_recently(self, hours: float) -> bool:
+        """最近 hours 小时内是否已成功运行（--if-stale 判定）。"""
         session = get_session()
         row = session.get(MetaKV, "last_run_at")
         if not row:
             return False
         try:
-            return datetime.fromisoformat(row.value).date() == datetime.utcnow().date()
+            last = datetime.fromisoformat(row.value)
         except ValueError:
             return False
+        return (datetime.utcnow() - last).total_seconds() < hours * 3600
 
     def _has_data(self, session) -> bool:
         return session.execute(select(Paper.id).limit(1)).first() is not None

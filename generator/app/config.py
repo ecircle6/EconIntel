@@ -50,6 +50,7 @@ class Config:
         self.history_days = _env_int("EI_HISTORY_DAYS", 90)          # 导出窗口（滚动分片）
         self.fetch_days_first = _env_int("EI_FETCH_DAYS_FIRST", 90)  # 首跑回填窗口
         self.fetch_days_incremental = _env_int("EI_FETCH_DAYS_INCREMENTAL", 3)  # 每日增量窗口
+        self.stale_hours = _env_float("EI_STALE_HOURS", 5.0)  # --if-stale 阈值：最近 N 小时内跑过则跳过
         # ---- 网络 ----
         self.request_timeout = _env_float("EI_REQUEST_TIMEOUT", 8.0)
         self.series_workers = _env_int("EI_SERIES_WORKERS", 6)       # RePEc 系列详情并发

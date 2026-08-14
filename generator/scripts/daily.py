@@ -24,7 +24,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 def main() -> int:
     ap = argparse.ArgumentParser(description="EconIntel 每日更新")
     ap.add_argument("--full", action="store_true", help="全量回填（首跑用）")
-    ap.add_argument("--if-stale", action="store_true", help="今日已成功运行过则跳过")
+    ap.add_argument("--if-stale", action="store_true",
+                    help="最近 EI_STALE_HOURS（默认 5）小时内已成功运行过则跳过（定时任务防重复）")
     ap.add_argument("--force", action="store_true", help="忽略 stale 检查强制运行（手动触发用）")
     ap.add_argument("--no-export", action="store_true", help="只更新数据库，不导出站点")
     args = ap.parse_args()
@@ -38,7 +39,7 @@ def main() -> int:
         return 1
 
     if stats.get("skipped"):
-        print("今日已生成过数据，跳过（兜底检查通过）")
+        print("最近 EI_STALE_HOURS 小时内已成功运行过，跳过本次（防重复）")
         print("RESULT=SKIPPED")
         return 0
 

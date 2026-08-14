@@ -8,8 +8,7 @@ on:
   push:
     branches: [main]      # 推送即部署（首次推送自动触发构建）
   schedule:
-    - cron: "0 0 * * *"   # 北京时间 08:00
-    - cron: "0 4 * * *"   # 北京时间 12:00（兜底）
+    - cron: "0 */6 * * *" # 每 6 小时自动更新（北京时间 2/8/14/20 点；--if-stale 防止重复跑）
   workflow_dispatch:      # 支持手动触发
 
 permissions:
