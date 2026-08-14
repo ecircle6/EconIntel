@@ -67,9 +67,9 @@ class Config:
         self.llm_timeout = _env_float("EI_LLM_TIMEOUT", 60.0)
         # ---- 重要性评分权重（合计 100）----
         self.importance_weights = {
-            "institution": _env_int("EI_W_INSTITUTION", 32),  # 机构权威（A/B/C 内再分级）
-            "citations": _env_int("EI_W_CITATIONS", 30),      # 引用数（对数归一化）
-            "recency": _env_int("EI_W_RECENCY", 26),          # 时效性（分段）
+            "institution": _env_int("EI_W_INSTITUTION", 40),  # 机构权威（A/B/C 内再分级）
+            "citations": _env_int("EI_W_CITATIONS", 23),      # 引用数（对数归一化）
+            "recency": _env_int("EI_W_RECENCY", 25),          # 时效性（分段）
             "paper_type": _env_int("EI_W_TYPE", 12),          # 论文类型（期刊加分）
         }
 

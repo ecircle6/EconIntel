@@ -63,24 +63,24 @@ class TestDedup(unittest.TestCase):
 
 
 class TestImportance(unittest.TestCase):
-    W = {"institution": 32, "citations": 30, "recency": 26, "paper_type": 12}
+    W = {"institution": 40, "citations": 23, "recency": 25, "paper_type": 12}
     TODAY = datetime(2026, 8, 14)
 
     def test_fresh_hot(self):
         # A 官方机构 + 期刊 + 100 引用（满分档）+ 近 3 天 → 🔥热点
         score = compute_score("A", "journal", 100, self.TODAY - timedelta(days=3), self.TODAY, self.W)
-        self.assertGreaterEqual(score, 80)
+        self.assertGreaterEqual(score, 68)
         self.assertEqual(label_for(score), "🔥热点")
 
     def test_old_low(self):
         score = compute_score("C", "working", 0, self.TODAY - timedelta(days=85), self.TODAY, self.W)
-        self.assertLess(score, 60)
+        self.assertLess(score, 50)
         self.assertEqual(label_for(score), "📄普通")
 
     def test_fresh_a_authority_reaches_star(self):
         # A 机构最新工作论文（无引用）也应达到 ⭐（顶级机构新论文有区分度）
         score = compute_score("A", "working", 0, self.TODAY - timedelta(days=3), self.TODAY, self.W)
-        self.assertGreaterEqual(score, 60)
+        self.assertGreaterEqual(score, 50)
         self.assertEqual(label_for(score), "⭐重要")
 
     def test_citation_differentiation(self):
@@ -94,13 +94,13 @@ class TestImportance(unittest.TestCase):
     def test_score_has_decimal(self):
         score = compute_score("A", "journal", 33, self.TODAY - timedelta(days=12), self.TODAY, self.W)
         self.assertIsInstance(score, float)
-        self.assertGreaterEqual(score, 80)  # 高分段仍可达
+        self.assertGreaterEqual(score, 68)  # 高分段仍可达
 
     def test_breakdown_transparency(self):
         from app.processors.importance import score_breakdown
 
         bd = score_breakdown("A", "journal", 50, self.TODAY, self.TODAY, self.W)
-        self.assertEqual(bd["institution"], 32.0)
+        self.assertEqual(bd["institution"], 40.0)
         self.assertAlmostEqual(bd["total"], bd["institution"] + bd["citations"] + bd["recency"] + bd["paper_type"])
         self.assertLessEqual(bd["total"], 100.0)
 

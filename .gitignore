@@ -15,4 +15,7 @@ site/
 *.db-shm
 *.db-wal
 
+# GUI 测试截图（本地验证用，不提交）
+gui-test-screenshots/
+
 # 注意：generator/data/*.db 需要提交（备份），因此不忽略 .db 本身

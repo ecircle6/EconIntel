@@ -49,11 +49,16 @@ function loadScript(url, cb) {
   s.onerror = function () { cb && cb(); }; // 失败也继续，避免卡死
   document.head.appendChild(s);
 }
+// 标签 → 徽章样式（以后端算好的标签 p.l 为准，避免前端取整与后端阈值不一致）
+function labelInfo(l) {
+  if (l && l.indexOf("热点") >= 0) return { cls: "l-hot", icon: "🔥" };
+  if (l && l.indexOf("重要") >= 0) return { cls: "l-imp", icon: "⭐" };
+  return { cls: "l-norm", icon: "📄" };
+}
 function badgeHtml(p) {
-  var score = Math.round(p.s);
-  var cls = score >= 80 ? "l-hot" : score >= 60 ? "l-imp" : "l-norm";
-  var icon = score >= 80 ? "🔥" : score >= 60 ? "⭐" : "📄";
-  return '<span class="badge ' + cls + '">' + icon + " " + score + "</span>";
+  var li = labelInfo(p.l);
+  var score = p.s == null ? "?" : p.s.toFixed(1);
+  return '<span class="badge ' + li.cls + '">' + li.icon + " " + score + "</span>";
 }
 
 /* ---------- 分片加载 ---------- */

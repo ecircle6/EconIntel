@@ -36,8 +36,9 @@ Pages.filteredPapers = function () {
 function cardHtml(p) {
   var authors = (p.a || []).join(", ");
   var kw = (p.k || []).map(function (k) { return '<span class="chip">' + esc(k) + "</span>"; }).join("");
+  var cardCls = labelInfo(p.l).cls === "l-norm" ? "" : labelInfo(p.l).cls;
   return (
-    '<div class="paper-card ' + (p.s >= 80 ? "l-hot" : p.s >= 60 ? "l-imp" : "") + '" data-id="' + p.id + '">' +
+    '<div class="paper-card ' + cardCls + '" data-id="' + p.id + '">' +
     '<div class="pc-top">' + badgeHtml(p) +
     (p.f ? '<span class="badge badge-field">' + esc(p.f) + "</span>" : "") +
     '<span class="badge badge-src">' + esc(p.src) + "</span>" +
@@ -136,7 +137,7 @@ function renderModal(d) {
       ? "引用数未知（按 0 计）"
       : "引用 " + d.ct + "（来源：" + (d.cs === "crossref" ? "CrossRef" : d.cs === "openalex" ? "OpenAlex" : d.cs === "s2" ? "Semantic Scholar" : "未知") + "）";
     scoreHtml =
-      '<div class="m-section"><h4>重要性评分构成（' + Math.round(d.s) + " / 100）</h4>" +
+      '<div class="m-section"><h4>重要性评分构成（' + (d.s == null ? "?" : d.s.toFixed(1)) + " / 100）</h4>" +
       '<div class="m-meta">' +
       "<span>机构权威</span><span><b>" + bd.institution + " 分</b>（" + (d.cr === "A" ? "A 官方机构" : d.cr === "B" ? "B 学术数据库" : "C 预印本") + "）</span>" +
       "<span>引用数</span><span><b>" + bd.citations + " 分</b>（" + citeNote + "）</span>" +
